@@ -1,0 +1,142 @@
+plugins {
+    id "com.android.application"
+    id "kotlin-android"
+    id "dev.flutter.flutter-gradle-plugin"
+    id "com.google.gms.google-services"
+}
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file('local.properties')
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withReader('UTF-8') { reader ->
+        localProperties.load(reader)
+    }
+}
+
+def flutterVersionCode = localProperties.getProperty('flutter.versionCode')
+if (flutterVersionCode == null) {
+    flutterVersionCode = '1'
+}
+
+def flutterVersionName = localProperties.getProperty('flutter.versionName')
+if (flutterVersionName == null) {
+    flutterVersionName = '1.0'
+}
+
+android {
+    compileSdkVersion 36
+    flavorDimensions "flavour"
+    namespace 'com.aether.app'
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
+    }
+
+    kotlinOptions {
+        jvmTarget = JavaVersion.VERSION_1_8
+    }
+
+    //! ---------------- Start naming Of app ------------ 
+
+    def versionPropsFile = file('version.properties') 
+    def versionBuild     
+    //* get last version and increment
+    if (versionPropsFile.canRead()) {
+        def Properties versionProps = new Properties()
+        versionProps.load(new FileInputStream(versionPropsFile))
+        versionBuild = versionProps['VERSION_BUILD'].toInteger()
+    } else {
+        throw new FileNotFoundException("Could not read version.properties!")
+    }
+
+    ext.autoIncrementBuildNumber = {
+
+        if (versionPropsFile.canRead()) {
+            def Properties versionProps = new Properties()
+            versionProps.load(new FileInputStream(versionPropsFile))
+            versionBuild = versionProps['VERSION_BUILD'].toInteger() + 1
+            versionProps['VERSION_BUILD'] = versionBuild.toString()
+            versionProps.store(versionPropsFile.newWriter(), null)
+        } else {
+            throw new FileNotFoundException("Could not read version.properties!")
+        }
+    }
+
+     gradle.taskGraph.whenReady {taskGraph ->
+        if (taskGraph.hasTask(assembleDebug)) {  
+            autoIncrementBuildNumber()
+        } else if (taskGraph.hasTask(assembleRelease)) { 
+            autoIncrementBuildNumber()
+        }
+    }
+
+    splits {
+        abi {
+            enable true
+            reset()
+            include 'armeabi-v7a','x86','x86_64'
+            universalApk true
+        }
+    }
+
+     android.applicationVariants.all { variant ->
+        variant.outputs.all { output ->
+            output.outputFileName = "Project Aether_${variant.getFlavorName()}_${variant.buildType.name}_v${versionName}_${new Date().format('dd_MMM_yyyy')}_${output.getFilter(com.android.build.OutputFile.ABI)}.apk"
+                  }
+    }
+
+    //! ---------------- END naming Of app ------------ 
+
+    sourceSets {
+        main.java.srcDirs += 'src/main/kotlin'
+    }
+
+    defaultConfig {
+        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
+        applicationId "com.aether.app"
+        minSdkVersion 28
+        targetSdkVersion 36
+        versionCode flutterVersionCode.toInteger()
+        versionName flutterVersionName
+        multiDexEnabled true
+    }
+
+
+    productFlavors {
+
+        dev {
+            dimension "flavour"
+            applicationIdSuffix ".dev"
+            resValue "string", "app_name", "Project Aether Dev"
+        }
+
+        prod {
+            dimension "flavour"
+            resValue "string", "app_name", "Project Aether"
+        }
+
+    }
+
+
+    buildTypes {
+
+        release {
+            signingConfig signingConfigs.debug
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro' 
+            ndk {
+                abiFilters 'armeabi-v7a','arm64-v8a','x86_64'
+            }
+        }
+    }
+}
+
+flutter {
+    source '../..'
+}
+
+dependencies {
+    implementation platform('com.google.firebase:firebase-bom:32.6.0')
+    implementation 'com.google.firebase:firebase-analytics'
+}

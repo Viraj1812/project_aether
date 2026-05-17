@@ -1,0 +1,88 @@
+name: project_aether
+description: A new Flutter application.
+
+publish_to: "none"
+
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  auto_route: ^9.2.2
+  flutter:
+    sdk: flutter
+  envied: ^0.5.4+1
+  get_it: ^8.0.3
+  pull_to_refresh: ^2.0.0
+  connectivity_plus: ^5.0.1
+  sentry_flutter: ^9.8.0
+  master_utility: ^0.0.20
+  internet_connection_checker: ^1.0.0+1
+  import_sorter: ^4.6.0
+  firebase_core: ^4.9.0
+  easy_localization: ^3.0.7
+  flutter_riverpod: ^3.3.1
+  cloud_firestore: ^6.4.1
+  synchronized: ^3.4.0
+  
+
+dev_dependencies:
+  auto_route_generator: ^9.0.0
+  envied_generator: ^0.5.4+1
+  flutter_test:
+    sdk: flutter
+  danger_core: ^2.0.0
+  build_runner: ^2.4.13
+  very_good_analysis: ^6.0.0
+  flutter_gen_runner: 5.8.0
+  fake_cloud_firestore: ^4.1.1
+  flutter_lints: ^6.0.0
+
+dependency_overrides:
+  intl:
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - .env
+    - assets/colors/
+    - assets/l10n/
+
+# flutter_gen:
+#   integrations:
+#     flutter_svg: true
+
+flutter_gen:
+  output: lib/config/assets/ # Optional (default: lib/gen/)
+  line_length: 80 # Optional (default: 80)
+
+  integrations:
+    flutter_svg: true
+    rive: true
+    lottie: true
+
+  assets:
+    enabled: true
+
+    exclude:
+      - .env.development
+      - .env.production
+
+    outputs:
+      class_name: AppAssets
+      package_parameter_enabled: false
+      style: dot-delimiter
+
+  fonts:
+    enabled: true
+    outputs:
+      class_name: AppFonts
+
+  colors:
+    enabled: true
+    outputs:
+      class_name: AppColors
+    inputs:
+      - assets/colors/colors.xml

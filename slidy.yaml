@@ -1,0 +1,249 @@
+slidy: "1"
+variables:
+  customMessage: "Complete" # Gets  ${Local.var.customMessage}
+
+scripts:
+  #* Clean up project (slidy run doctor)
+  doctor: flutter doctor
+
+  #* Environment commands
+  generateLocal:
+    description: "It will generate the local env file"
+    steps:
+      - name: "Generate Local files"
+        run: flutter pub  run easy_localization:generate -S assets/l10n -f keys -O lib/l10n -o locale_keys.g.dart
+
+  useProd:
+    description: "It will change the environment to production"
+    steps:
+      - name: "Copy env file"
+        run: cp .env.prod .env
+
+      - name: "Remove dart tool folder"
+        run: rm -rf .dart_tool
+
+      - name: "Run build runner"
+        run: dart run build_runner build --delete-conflicting-outputs
+
+  useDev:
+    description: "It will change the environment to development"
+    steps:
+      - name: "Copy env file"
+        run: cp .env.dev .env
+
+      - name: "Remove dart tool folder"
+        run: rm -rf .dart_tool
+
+      - name: "Run build runner"
+        run: dart run build_runner build --delete-conflicting-outputs
+
+  #* Clean up project (slidy run cleanProject)
+  cleanProject:
+    description: "Clean | Get Packages | import Sorter | dart info | flutter formate | dart analyze | dart fix |"
+    steps:
+      - name: "Clean"
+        description: "Flutter clean"
+        run: flutter clean
+
+      - name: "Get Packages"
+        description: "gets all the dependencies"
+        run: flutter pub get
+
+      - name: "import sorter"
+        description: "organize your dart imports"
+        run: flutter pub run import_sorter:main
+
+      - name: "dart info"
+        description: "Dart processes, and project information"
+        run: dart info
+
+      - name: "flutter formate"
+        description: "Formate Flutter Code"
+        run: dart format .
+
+      - name: "dart fix --dry-run"
+        description: "see suggested issues"
+        run: dart fix --dry-run
+
+      - name: "dart fix --apply"
+        description: "Fix all problems"
+        run: dart fix --apply
+
+      - name: "dart analyze"
+        description: "Analysis issues identified."
+        run: dart analyze
+
+  #* iOS clean up project (slidy run cleanupIos)
+  cleanupIos:
+    description: "cleanup iOS project"
+    steps:
+      - name: "Clean"
+        run: slidy run cleanProject
+
+      - name: "PodClean"
+        description: "Execute pod clean"
+        shell: bash # default: command. options (command|bash|sh|zsh|pwsh)
+        condition: "${System.operatingSystem} == macos"
+        working-directory: ios
+        run: |-
+          rm Podfile.lock
+          pod deintegrate
+          pod update
+          pod install
+
+      - run: echo ${Local.var.customMessage}
+
+  #* Prod APK command (slidy run buildAndroidProd)
+  buildAndroidProd:
+    description: "Build Production apk"
+    steps:
+      - name: "Build Prod apk"
+        run: flutter build apk --flavor prod -t lib/config/flavours/prod/prod.dart
+
+  #* Dev APK command (slidy run buildAndroidDev)
+  buildAndroidDev:
+    description: "Build Development apk"
+    steps:
+      - name: "Build Dev apk"
+        run: flutter build apk --flavor dev -t lib/config/flavours/dev/dev.dart
+
+  #* Prod IPA command (slidy run buildiOSProd)
+  buildiOSProd:
+    description: "Build Production ipa"
+    steps:
+      - name: "Build Prod ipa"
+        run: flutter build ipa --flavor prod -t lib/config/flavours/prod/prod.dart --export-method development
+        
+      - name: "Slidy Upload IPA to DIAWI"
+        run: slidy run uploadIpaToDiawi
+        
+  #* Dev IPA command (slidy run buildiOSDev)
+  buildiOSDev:
+    description: "Build Development ipa"
+    steps:
+      - name: "Build Dev ipa"
+        run: flutter build ipa --flavor dev -t lib/config/flavours/dev/dev.dart --export-method development
+
+      - name: "Slidy Upload IPA to DIAWI"
+        run: slidy run uploadIpaToDiawi
+
+  #* Command to upload IPA to Diawi
+  uploadIpaToDiawi:
+    description: "Upload IPA to Diawi"
+    steps:
+      - name: "Check for IPA File"
+        shell: bash
+        condition: "${System.operatingSystem} == macos"
+        run: |-
+          IPA_PATH="build/ios/ipa/Project Aether.ipa"
+          if [ ! -f "$IPA_PATH" ]; then
+            echo "Error: IPA file not found at $IPA_PATH"
+            exit 1
+          fi
+          echo "IPA exists at $IPA_PATH."
+
+      - name: "Upload IPA to Diawi"
+        shell: bash
+        condition: "${System.operatingSystem} == macos"
+        run: |-
+
+          if [ -f .env ]; then
+            # Read the .env file safely
+            while IFS= read -r line; do
+              # Ignore comments and empty lines
+              [[ "$line" =~ ^#.*$ || -z "$line" ]] && continue
+
+              # Remove leading and trailing spaces
+              line=$(echo "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+
+              # Ensure the line is a valid key=value pair
+              if [[ "$line" =~ ^[A-Za-z_][A-Za-z0-9_]*=.*$ ]]; then
+                # Remove spaces around '='
+                line=$(echo "$line" | sed 's/ *= */=/')
+
+                # Export the variable
+                key=$(echo "$line" | cut -d '=' -f 1)
+                value=$(echo "$line" | cut -d '=' -f 2-)
+                export "$key=$(echo "$value" | sed 's/^"\(.*\)"$/\1/')"
+              fi
+            done < .env
+          else
+            echo "Error: .env file not found"
+            exit 1
+          fi
+
+          # Verify DIAWI_API_TOKEN is loaded
+          if [ -z "$DIAWI_API_TOKEN" ]; then
+            echo "Error: DIAWI_API_TOKEN is not set in the .env file"
+            exit 1
+          fi
+
+          echo "DIAWI_API_TOKEN loaded successfully."
+
+          IPA_PATH="build/ios/ipa/Project Aether.ipa"
+          echo "Uploading to Diawi..."
+          UPLOAD_RESPONSE=$(curl -s -F "file=@$IPA_PATH" \
+              -F "token=$DIAWI_API_TOKEN" \
+              -F "wall_of_apps=true" \
+              https://upload.diawi.com/)
+
+          echo "Response from Diawi: $UPLOAD_RESPONSE"
+
+          # Handle empty response
+          if [ -z "$UPLOAD_RESPONSE" ]; then
+            echo "Error: No response from Diawi. Please check your network or Diawi API token."
+            exit 1
+          fi
+
+          # Extract job ID
+          JOB_ID=$(echo "$UPLOAD_RESPONSE" | grep -o '"job":"[^"]*' | sed 's/"job":"//')
+
+          if [ -z "$JOB_ID" ]; then
+            echo "Error: Unable to retrieve the job ID. Response: $UPLOAD_RESPONSE"
+            exit 1
+          fi
+
+          echo "Upload initiated. Job ID: $JOB_ID"
+
+          # Polling for the download link
+          echo "Polling for the download link..."
+          POLL_LIMIT=60  # Maximum polling attempts (5 minutes with 5-second intervals)
+          POLL_COUNT=0
+
+          while true; do
+            STATUS_RESPONSE=$(curl -s -G \
+                --data-urlencode "token=$DIAWI_API_TOKEN" \
+                --data-urlencode "job=$JOB_ID" \
+                https://upload.diawi.com/status)
+
+            echo "Status response: $STATUS_RESPONSE"  # Log for debugging
+
+            STATUS=$(echo "$STATUS_RESPONSE" | grep -o '"status":[0-9]*' | sed 's/"status"://')
+            LINK=$(echo "$STATUS_RESPONSE" | jq -r '.link')
+
+            if [ "$STATUS" -eq 0 ]; then
+              echo "Upload is still in progress..."
+            elif [ "$STATUS" -eq 2001 ]; then
+              echo "Processing, please try again in a few seconds..."
+            elif [ "$STATUS" -eq 1 ] || [ "$STATUS" -eq 2000 ]; then
+              if [ -z "$LINK" ]; then
+                echo "Error: Unable to extract the Diawi link. Status response: $STATUS_RESPONSE"
+                exit 1
+              fi
+              echo "Upload successful! Diawi link: $LINK"
+              qrencode -t ANSIUTF8 $LINK
+              break
+            else
+              echo "Error: Upload failed or encountered an issue. Status response: $STATUS_RESPONSE"
+              exit 1
+            fi
+
+            POLL_COUNT=$((POLL_COUNT + 1))
+            if [ "$POLL_COUNT" -ge "$POLL_LIMIT" ]; then
+              echo "Error: Timed out while waiting for the upload to complete."
+              exit 1
+            fi
+
+            # Wait for a few seconds before polling again
+            sleep 5
+          done
